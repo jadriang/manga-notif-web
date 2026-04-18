@@ -1,0 +1,16 @@
+name: Check Manga Updates
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger manga check
+        run: |
+          curl -sf -X POST "${{ secrets.API_URL }}/api/cron/check" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json"
