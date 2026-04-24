@@ -28,8 +28,10 @@ export default function LoginPage() {
   return (
     <div className="login-page">
       <div className="login-card">
-        <h1>📖 Manga Notifier</h1>
-        <p className="subtitle">Get notified when new chapters drop</p>
+        <div className="login-brand">
+          <h1>📖 Manga Notifier</h1>
+          <p className="subtitle">Track new chapters automatically</p>
+        </div>
 
         <form onSubmit={handleSubmit}>
           <input
@@ -49,18 +51,20 @@ export default function LoginPage() {
           />
           {error && <p className="error">{error}</p>}
           <button type="submit" disabled={loading}>
-            {loading ? "..." : isSignUp ? "Sign Up" : "Sign In"}
+            {loading ? "..." : isSignUp ? "Create Account" : "Sign In"}
           </button>
         </form>
+
+        <div className="login-divider">or</div>
 
         <button className="google-btn" onClick={handleGoogleLogin}>
           Continue with Google
         </button>
 
-        <p className="toggle">
+        <p className="login-toggle">
           {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
           <a href="#" onClick={() => setIsSignUp(!isSignUp)}>
-            {isSignUp ? "Sign In" : "Sign Up"}
+            {isSignUp ? "Sign in" : "Sign up"}
           </a>
         </p>
       </div>
