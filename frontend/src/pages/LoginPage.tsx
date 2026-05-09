@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { supabase } from "../lib/supabase";
 
+const API_URL = import.meta.env.VITE_API_URL as string;
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -13,16 +15,30 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
+    if (isSignUp) {
+      try {
+        const resp = await fetch(
+          `${API_URL}/api/auth/check-email?email=${encodeURIComponent(email)}`
+        );
+        const data = await resp.json();
+        if (!data.allowed) {
+          setError("You're not on the access list.");
+          setLoading(false);
+          return;
+        }
+      } catch {
+        setError("Could not verify email. Please try again.");
+        setLoading(false);
+        return;
+      }
+    }
+
     const { error } = isSignUp
       ? await supabase.auth.signUp({ email, password })
       : await supabase.auth.signInWithPassword({ email, password });
 
     if (error) setError(error.message);
     setLoading(false);
-  };
-
-  const handleGoogleLogin = async () => {
-    await supabase.auth.signInWithOAuth({ provider: "google" });
   };
 
   return (
@@ -54,12 +70,6 @@ export default function LoginPage() {
             {loading ? "..." : isSignUp ? "Create Account" : "Sign In"}
           </button>
         </form>
-
-        <div className="login-divider">or</div>
-
-        <button className="google-btn" onClick={handleGoogleLogin}>
-          Continue with Google
-        </button>
 
         <p className="login-toggle">
           {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
