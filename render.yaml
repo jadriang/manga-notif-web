@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: manga-notif-api
+    runtime: python
+    plan: free
+    region: oregon
+    branch: main
+    rootDir: backend
+    autoDeploy: true
+    healthCheckPath: /api/health
+    buildCommand: pip install -r requirements.txt && alembic upgrade head
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: CRON_SECRET
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
