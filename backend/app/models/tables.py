@@ -71,4 +71,4 @@ class ChapterState(Base):
 class AllowedEmail(Base):
     __tablename__ = "allowed_emails"
 
-    email: Mapped[str] = mapped_column(Text, primary_key=True)
+    email: Mapped[str] = mapped_column(String(320), primary_key=True)
