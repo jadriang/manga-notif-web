@@ -44,7 +44,7 @@ export default function DashboardPage() {
       <header className="header">
         <h1>📖 Manga Notifier</h1>
         <nav>
-          <Link to="/add">+ Add Manga</Link>
+          <span style={{ opacity: 0.4, cursor: "not-allowed" }}>+ Add Manga</span>
           <Link to="/settings">Settings</Link>
           <a href="#" onClick={signOut}>
             Sign Out
@@ -88,9 +88,7 @@ export default function DashboardPage() {
       </div>
 
       {manga.length === 0 && (
-        <p className="empty">
-          No manga tracked yet. <Link to="/add">Add one!</Link>
-        </p>
+        <p className="empty">No manga tracked yet.</p>
       )}
     </div>
   );

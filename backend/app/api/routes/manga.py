@@ -43,6 +43,8 @@ async def create_manga(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Adding manga is temporarily disabled.")
+
     parsed = parse_manga_url(body.url)
     if not parsed:
         raise HTTPException(status_code=400, detail="Unsupported URL. Use an AsuraScans or DemonicScans manga page URL.")

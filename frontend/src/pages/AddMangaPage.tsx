@@ -41,7 +41,8 @@ export default function AddMangaPage() {
       </header>
 
       <div className="add-form-container">
-        <form onSubmit={handleSubmit} className="add-form">
+        <p className="error">Adding manga is temporarily disabled. Check back later.</p>
+        <form onSubmit={handleSubmit} className="add-form" style={{ opacity: 0.5, pointerEvents: "none" }}>
           <label>
             Manga URL
             <input
