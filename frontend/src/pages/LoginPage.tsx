@@ -9,6 +9,7 @@ export default function LoginPage() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [signedUp, setSignedUp] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,9 +38,36 @@ export default function LoginPage() {
       ? await supabase.auth.signUp({ email, password })
       : await supabase.auth.signInWithPassword({ email, password });
 
-    if (error) setError(error.message);
+    if (error) {
+      setError(error.message);
+    } else if (isSignUp) {
+      setSignedUp(true);
+    }
     setLoading(false);
   };
+
+  if (signedUp) {
+    return (
+      <div className="login-page">
+        <div className="login-card">
+          <div className="login-brand">
+            <h1>📖 Manga Notifier</h1>
+          </div>
+          <div className="verify-email">
+            <p className="verify-icon">📬</p>
+            <h2>Check your email</h2>
+            <p>We sent a verification link to <strong>{email}</strong>. Click it to activate your account, then sign in.</p>
+          </div>
+          <p className="login-toggle">
+            Already verified?{" "}
+            <a href="#" onClick={() => { setSignedUp(false); setIsSignUp(false); }}>
+              Sign in
+            </a>
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="login-page">
@@ -73,7 +101,7 @@ export default function LoginPage() {
 
         <p className="login-toggle">
           {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
-          <a href="#" onClick={() => setIsSignUp(!isSignUp)}>
+          <a href="#" onClick={() => { setIsSignUp(!isSignUp); setError(""); }}>
             {isSignUp ? "Sign in" : "Sign up"}
           </a>
         </p>

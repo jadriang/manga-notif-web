@@ -121,6 +121,11 @@ a:hover { text-decoration: underline; }
 .login-brand .subtitle { color: var(--text-muted); font-size: 0.875rem; }
 .login-card form { display: flex; flex-direction: column; gap: 0.65rem; }
 
+.verify-email { text-align: center; padding: 0.5rem 0 1.25rem; }
+.verify-icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
+.verify-email h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem; }
+.verify-email p { color: var(--text-muted); font-size: 0.875rem; line-height: 1.5; }
+
 .login-divider {
   text-align: center;
   color: var(--text-muted);
