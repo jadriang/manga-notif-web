@@ -3,11 +3,14 @@ import { api, type Manga } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
 import { Link } from "react-router-dom";
 
+type FilterTab = "all" | "subscribed";
+
 export default function DashboardPage() {
   const { signOut } = useAuth();
   const [manga, setManga] = useState<Manga[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [filter, setFilter] = useState<FilterTab>("all");
 
   useEffect(() => {
     loadManga();
@@ -37,44 +40,73 @@ export default function DashboardPage() {
     }
   };
 
-  if (loading) return <div className="page">Loading...</div>;
+  if (loading) {
+    return (
+      <div className="page loading-page">
+        <div className="loader"></div>
+      </div>
+    );
+  }
+
+  const filtered = filter === "subscribed" ? manga.filter((m) => m.subscribed) : manga;
+  const subscribedCount = manga.filter((m) => m.subscribed).length;
 
   return (
     <div className="page">
       <header className="header">
-        <h1>📖 Manga Notifier</h1>
+        <div className="header-brand">
+          <span className="brand-icon">📖</span>
+          <h1>Manga Notifier</h1>
+        </div>
         <nav>
-          <Link to="/add">+ Add Manga</Link>
+          <Link to="/add" className="btn-add">+ Add Manga</Link>
           <Link to="/settings">Settings</Link>
-          <a href="#" onClick={signOut}>
-            Sign Out
-          </a>
+          <button className="signout-btn" onClick={signOut}>Sign Out</button>
         </nav>
       </header>
 
       {error && <p className="error">{error}</p>}
 
-      <h2>All Manga</h2>
+      <div className="dashboard-toolbar">
+        <div className="filter-tabs">
+          <button
+            className={`filter-tab ${filter === "all" ? "active" : ""}`}
+            onClick={() => setFilter("all")}
+          >
+            All <span className="tab-count">{manga.length}</span>
+          </button>
+          <button
+            className={`filter-tab ${filter === "subscribed" ? "active" : ""}`}
+            onClick={() => setFilter("subscribed")}
+          >
+            Subscribed <span className="tab-count">{subscribedCount}</span>
+          </button>
+        </div>
+      </div>
+
       <div className="manga-grid">
-        {manga.map((m) => (
+        {filtered.map((m) => (
           <div key={m.id} className={`manga-card ${m.subscribed ? "subscribed" : ""}`}>
-            {m.cover_url && (
-              <img src={m.cover_url} alt={m.title} className="cover" />
-            )}
+            <div className="card-cover">
+              {m.cover_url ? (
+                <img src={m.cover_url} alt={m.title} className="cover" />
+              ) : (
+                <div className="cover-placeholder">📖</div>
+              )}
+              {m.subscribed && <span className="subscribed-badge">✓</span>}
+            </div>
             <div className="manga-info">
-              <h3>{m.title}</h3>
+              <h3 title={m.title}>{m.title}</h3>
+              <div className="sites">
+                {m.asura_slug && <span className="site-tag site-asura">AsuraScans</span>}
+                {m.demonic_slug && <span className="site-tag site-demonic">DemonicScans</span>}
+              </div>
               <div className="chapters">
                 {Object.entries(m.latest_chapters).map(([site, ch]) => (
                   <span key={site} className="chapter-badge">
-                    {site}: Ch.{ch}
+                    Ch.{ch}
                   </span>
                 ))}
-              </div>
-              <div className="sites">
-                {m.asura_slug && <span className="site-tag">AsuraScans</span>}
-                {m.demonic_slug && (
-                  <span className="site-tag">DemonicScans</span>
-                )}
               </div>
               <button
                 className={m.subscribed ? "btn-unsub" : "btn-sub"}
@@ -87,10 +119,22 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {manga.length === 0 && (
-        <p className="empty">
-          No manga tracked yet. <Link to="/add">Add one!</Link>
-        </p>
+      {filtered.length === 0 && (
+        <div className="empty-state">
+          {filter === "subscribed" ? (
+            <>
+              <p>No subscriptions yet.</p>
+              <button className="filter-tab" onClick={() => setFilter("all")}>
+                View all manga
+              </button>
+            </>
+          ) : (
+            <>
+              <p>No manga tracked yet.</p>
+              <Link to="/add" className="btn-add">Add your first manga</Link>
+            </>
+          )}
+        </div>
       )}
     </div>
   );
