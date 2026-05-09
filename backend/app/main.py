@@ -7,7 +7,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import cron, manga, subscriptions, telegram_routes, user
+from app.api.routes import auth, cron, manga, subscriptions, telegram_routes, user
 from app.config import settings
 
 logging.basicConfig(
@@ -30,6 +30,7 @@ app.include_router(subscriptions.router, prefix="/api")
 app.include_router(cron.router, prefix="/api")
 app.include_router(telegram_routes.router, prefix="/api")
 app.include_router(user.router, prefix="/api")
+app.include_router(auth.router, prefix="/api")
 
 
 @app.get("/api/health")
