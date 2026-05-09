@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
-from app.models.tables import User
+from app.models.tables import AllowedEmail, User
 
 logger = logging.getLogger(__name__)
 security = HTTPBearer()
@@ -88,6 +88,11 @@ async def get_current_user(
     user = result.scalar_one_or_none()
 
     if user is None:
+        allowed_result = await db.execute(
+            select(AllowedEmail).where(AllowedEmail.email == email.lower())
+        )
+        if allowed_result.scalar_one_or_none() is None:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not on access list")
         user = User(id=user_id, email=email)
         db.add(user)
         await db.commit()
