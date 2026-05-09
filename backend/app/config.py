@@ -14,6 +14,7 @@ class Settings(BaseSettings):
 
     # Telegram
     telegram_bot_token: str = ""
+    telegram_webhook_secret: str = ""
 
     # Cron secret (protects /api/cron/check)
     cron_secret: str = ""
