@@ -59,7 +59,7 @@ export default function DashboardPage() {
           <h1>Manga Notifier</h1>
         </div>
         <nav>
-          <Link to="/add" className="btn-add">+ Add Manga</Link>
+          <span className="btn-add" style={{ opacity: 0.4, cursor: "not-allowed" }}>+ Add Manga</span>
           <Link to="/settings">Settings</Link>
           <button className="signout-btn" onClick={signOut}>Sign Out</button>
         </nav>
@@ -129,10 +129,7 @@ export default function DashboardPage() {
               </button>
             </>
           ) : (
-            <>
-              <p>No manga tracked yet.</p>
-              <Link to="/add" className="btn-add">Add your first manga</Link>
-            </>
+            <p>No manga tracked yet.</p>
           )}
         </div>
       )}
