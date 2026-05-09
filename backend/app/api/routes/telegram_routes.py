@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import hmac
 import logging
 import secrets
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -36,8 +37,16 @@ async def generate_link_token(
 
 
 @router.post("/webhook")
-async def telegram_webhook(request: Request):
+async def telegram_webhook(
+    request: Request,
+    x_telegram_bot_api_secret_token: str = Header(default=""),
+):
     """Receive updates from Telegram Bot API."""
+    if settings.telegram_webhook_secret and not hmac.compare_digest(
+        x_telegram_bot_api_secret_token, settings.telegram_webhook_secret
+    ):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
     data = await request.json()
 
     message = data.get("message")

@@ -32,9 +32,9 @@ def chapter_is_newer(current: str, stored: str) -> bool:
 
 @router.post("/check")
 async def check_for_updates(authorization: str = Header(...)):
-    # Verify cron secret
+    import hmac
     expected = f"Bearer {settings.cron_secret}"
-    if authorization != expected:
+    if not hmac.compare_digest(authorization, expected):
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     async with async_session() as db:
