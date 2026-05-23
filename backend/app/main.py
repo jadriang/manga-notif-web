@@ -35,8 +35,4 @@ app.include_router(auth.router, prefix="/api")
 
 @app.get("/api/health")
 async def health():
-    from sqlalchemy import text
-    from app.database import async_session
-    async with async_session() as db:
-        await db.execute(text("SELECT 1"))
     return {"status": "ok"}
