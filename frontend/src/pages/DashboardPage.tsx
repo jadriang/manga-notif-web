@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { api, type Manga } from "../lib/api";
-import { useAuth } from "../contexts/AuthContext";
+import { useClerk } from "@clerk/clerk-react";
 import { Link } from "react-router-dom";
 
 type FilterTab = "all" | "subscribed";
 
 export default function DashboardPage() {
-  const { signOut } = useAuth();
+  const { signOut } = useClerk();
   const [manga, setManga] = useState<Manga[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -61,7 +61,7 @@ export default function DashboardPage() {
         <nav>
           <span className="btn-add" style={{ opacity: 0.4, cursor: "not-allowed" }}>+ Add Manga</span>
           <Link to="/settings">Settings</Link>
-          <button className="signout-btn" onClick={signOut}>Sign Out</button>
+          <button className="signout-btn" onClick={() => signOut()}>Sign Out</button>
         </nav>
       </header>
 
