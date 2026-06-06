@@ -6,12 +6,12 @@ Track manga series and get a Telegram message when a new chapter drops.
 
 ```
 ┌─────────────────┐        ┌──────────────────────┐        ┌─────────────┐
-│  React SPA      │──JWT──▶│  FastAPI backend      │──SQL──▶│  Supabase   │
+│  React SPA      │──JWT──▶│  FastAPI backend      │──SQL──▶│  Neon       │
 │  (GitHub Pages) │        │  (Render free)        │        │  Postgres   │
 └─────────────────┘        └──────────┬───────────┘        └─────────────┘
-                                      │                           │
-                           ┌──────────▼──────────┐        ┌──────▼──────┐
-                           │  GitHub Actions cron │        │  Supabase   │
+                                      │
+                           ┌──────────▼──────────┐        ┌─────────────┐
+                           │  GitHub Actions cron │        │  Clerk      │
                            │  (every 6 h)         │        │  Auth       │
                            └──────────────────────┘        └─────────────┘
                                       │
@@ -32,9 +32,9 @@ Track manga series and get a Telegram message when a new chapter drops.
 | Layer | Tech |
 |---|---|
 | Frontend | React 19 + TypeScript, Vite 8, React Router v7 |
-| Auth (client) | `@supabase/supabase-js` — email/password with email verification |
+| Auth (client) | `@clerk/clerk-react` — email/password + Google OAuth |
 | Backend | Python 3.12, FastAPI (async), SQLAlchemy 2 + asyncpg |
-| Auth (server) | JWT validation via Supabase JWKS (RS256) |
+| Auth (server) | JWT validation via Clerk JWKS |
 | Migrations | Alembic |
 | Scraping | httpx + BeautifulSoup4 + lxml (AsuraScans, Demonic Scans) |
 | Notifications | Telegram Bot API (webhook → backend) |
@@ -47,14 +47,15 @@ Track manga series and get a Telegram message when a new chapter drops.
 | Frontend | GitHub Pages | https://jadriang.github.io/manga-notif-web/ |
 | Backend | Render (free web) | https://manga-notif-web.onrender.com |
 | Cron | GitHub Actions | `.github/workflows/check-manga.yml` |
-| DB + Auth | Supabase (free) | — |
+| DB        | Neon Postgres          | — |
+| Auth      | Clerk (free tier)      | — |
 | Telegram | Webhook → backend | — |
 
 Render's free tier sleeps after ~15 min idle (~30–60s cold start). The cron warms it up before scraping. Health check: `GET /api/health` → `{"status":"ok"}`.
 
 ## How it works
 
-1. **Sign-up** is allowlist-gated — only emails in the `allowed_emails` table can register via Supabase Auth.
+1. **Sign-up** is invite-code-gated — after Clerk auth (email/password or Google), users must redeem an invite code (multi-use, stored in `invite_codes` table) before they can access the app.
 2. **Chapter checks** run every 6 h via GitHub Actions. The cron hits `/api/cron/check` (bearer-token protected), which scrapes all tracked manga in two passes — read DB, release connection, scrape, reconnect, write diffs — to minimise DB connection time (Neon auto-suspend).
 3. **Telegram linking** — user DMs the bot `/start`, which stores their `chat_id`. Subscriptions with `notify=true` + a linked `chat_id` receive a message when a new chapter is detected.
 
@@ -63,12 +64,12 @@ Render's free tier sleeps after ~15 min idle (~30–60s cold start). The cron wa
 ```sh
 # backend
 cd backend
-cp .env.example .env   # fill in Supabase + Telegram values
+cp .env.example .env   # fill in Clerk + Telegram values
 uvicorn app.main:app --reload
 
 # frontend
 cd frontend
-cp .env.example .env   # fill in VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, VITE_API_URL
+cp .env.example .env   # fill in VITE_CLERK_PUBLISHABLE_KEY, VITE_API_URL
 npm install
 npm run dev   # http://localhost:5173/manga-notif-web/
 ```
