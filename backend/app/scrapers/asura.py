@@ -14,22 +14,9 @@ CHAPTER_URL_RE = re.compile(r"/chapter/([\d.]+)$")
 log = logging.getLogger(__name__)
 
 
-async def get_latest_chapter(slug: str) -> dict | None:
-    url = BASE_URL.format(slug=slug)
-    try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(
-                url,
-                headers={"User-Agent": "MangaNotif/1.0 (+https://github.com)"},
-                timeout=30,
-                follow_redirects=True,
-            )
-            resp.raise_for_status()
-    except httpx.HTTPError as exc:
-        log.warning("AsuraScans request failed for %s: %s", slug, exc)
-        return None
-
-    soup = BeautifulSoup(resp.text, "lxml")
+def parse_latest_chapter(html: str, slug: str) -> dict | None:
+    """Parse a fetched AsuraScans page into the latest-chapter dict (no network)."""
+    soup = BeautifulSoup(html, "lxml")
 
     chapter_prefix = f"/comics/{slug}/chapter/"
     best_chapter: float = -1
@@ -57,8 +44,11 @@ async def get_latest_chapter(slug: str) -> dict | None:
     chapter_str = m2.group(1) if m2 else str(best_chapter)
     chapter_url = best_href if best_href.startswith("http") else f"https://asurascans.com{best_href}"
 
-    og = soup.find("meta", property="og:image")
-    cover_url = og["content"] if og and og.get("content") else None
+    og_image = soup.find("meta", property="og:image")
+    cover_url = og_image["content"] if og_image and og_image.get("content") else None
+
+    og_title = soup.find("meta", property="og:title")
+    title = og_title["content"].strip() if og_title and og_title.get("content") else None
 
     return {
         "chapter": chapter_str,
@@ -66,4 +56,23 @@ async def get_latest_chapter(slug: str) -> dict | None:
         "site": "AsuraScans",
         "site_key": "asura",
         "cover_url": cover_url,
+        "title": title,
     }
+
+
+async def get_latest_chapter(slug: str) -> dict | None:
+    url = BASE_URL.format(slug=slug)
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                url,
+                headers={"User-Agent": "MangaNotif/1.0 (+https://github.com)"},
+                timeout=30,
+                follow_redirects=True,
+            )
+            resp.raise_for_status()
+    except httpx.HTTPError as exc:
+        log.warning("AsuraScans request failed for %s: %s", slug, exc)
+        return None
+
+    return parse_latest_chapter(resp.text, slug)

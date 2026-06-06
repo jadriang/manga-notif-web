@@ -59,8 +59,7 @@ export default function AddMangaPage() {
       </header>
 
       <div className="add-form-container">
-        <p className="error">Adding manga is temporarily disabled. Check back later.</p>
-        <div className="add-form-card" style={{ opacity: 0.5, pointerEvents: "none" }}>
+        <div className="add-form-card">
           <p className="add-form-desc">
             Paste a manga page URL from AsuraScans or DemonicScans. The title and latest chapter will be fetched automatically.
           </p>

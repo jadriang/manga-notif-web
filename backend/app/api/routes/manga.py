@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 from typing import Optional
 
@@ -18,6 +19,19 @@ from app.scrapers.url_parser import parse_manga_url
 from app.scrapers import asura, demonic
 
 router = APIRouter(prefix="/manga", tags=["manga"])
+
+# Asura slugs carry a trailing "-<hex>" cache-busting suffix (e.g. "-75e30c62").
+_SLUG_HASH_RE = re.compile(r"-[0-9a-f]{6,}$")
+
+
+def resolve_manga_title(user_title: Optional[str], scraped_title: Optional[str], slug: str) -> str:
+    """Pick a display title: user override > scraped og:title > cleaned slug."""
+    if user_title and user_title.strip():
+        return user_title.strip()
+    if scraped_title and scraped_title.strip():
+        return scraped_title.strip()
+    cleaned = _SLUG_HASH_RE.sub("", slug)
+    return cleaned.replace("-", " ").strip().title()
 
 
 class MangaCreate(BaseModel):
@@ -43,8 +57,6 @@ async def create_manga(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Adding manga is temporarily disabled.")
-
     parsed = parse_manga_url(body.url)
     if not parsed:
         raise HTTPException(status_code=400, detail="Unsupported URL. Use an AsuraScans or DemonicScans manga page URL.")
@@ -74,13 +86,10 @@ async def create_manga(
     scraper = asura if site == "asura" else demonic
     result = await scraper.get_latest_chapter(slug)
 
-    title = body.title
-    if not title:
-        if result:
-            # try to get from og:title — for now use slug as fallback
-            title = slug.replace("-", " ").replace("75e30c62", "").strip().title()
-        else:
-            raise HTTPException(status_code=400, detail="Could not scrape this URL. Please provide a title manually.")
+    if not result and not body.title:
+        raise HTTPException(status_code=400, detail="Could not scrape this URL. Please provide a title manually.")
+
+    title = resolve_manga_title(body.title, result["title"] if result else None, slug)
 
     manga = Manga(
         title=title,
