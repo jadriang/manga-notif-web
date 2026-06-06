@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from time import monotonic
 from typing import Optional
 
 import httpx
@@ -19,17 +20,20 @@ from app.models.tables import User
 logger = logging.getLogger(__name__)
 security = HTTPBearer()
 
+JWKS_TTL_SECONDS = 3600
 _jwks_cache: Optional[list] = None
+_jwks_cached_at: float = 0.0
 
 
 async def _get_jwks() -> list:
-    global _jwks_cache
-    if _jwks_cache is not None:
+    global _jwks_cache, _jwks_cached_at
+    if _jwks_cache is not None and (monotonic() - _jwks_cached_at) < JWKS_TTL_SECONDS:
         return _jwks_cache
     async with httpx.AsyncClient() as client:
         resp = await client.get(settings.clerk_jwks_url, timeout=10)
         resp.raise_for_status()
     _jwks_cache = resp.json().get("keys", [])
+    _jwks_cached_at = monotonic()
     return _jwks_cache
 
 

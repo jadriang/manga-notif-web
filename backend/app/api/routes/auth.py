@@ -9,6 +9,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
 from pydantic import BaseModel
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import _decode_with_jwks, _get_jwks
@@ -72,7 +73,12 @@ async def redeem_invite(
         user = User(clerk_id=clerk_id, email=email.lower())
         db.add(user)
         invite.used_count += 1
-        await db.commit()
+        try:
+            await db.commit()
+        except IntegrityError:
+            await db.rollback()
+            logged_result = "already_redeemed"
+            raise HTTPException(status_code=409, detail="already_redeemed")
         await db.refresh(user)
 
         return {"id": str(user.id), "email": user.email, "clerk_id": user.clerk_id}

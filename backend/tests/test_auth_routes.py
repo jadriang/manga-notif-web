@@ -132,3 +132,49 @@ async def test_redeem_invite_unauthenticated(client):
         assert resp.status_code == 401
     finally:
         _reset()
+
+
+@pytest.mark.anyio
+async def test_redeem_invite_missing_email_claim(client):
+    """Token validates but lacks email claim — likely Clerk JWT template misconfigured."""
+    payload_no_email = {"sub": "user_2abc123"}
+    session = _make_db_session()
+    _override_db(session)
+
+    try:
+        with patch("app.api.routes.auth._verify_clerk_token", return_value=payload_no_email):
+            resp = await client.post(
+                "/api/auth/redeem-invite",
+                json={"code": "X"},
+                headers=AUTH_HEADERS,
+            )
+        assert resp.status_code == 401
+        assert resp.json()["detail"] == "Invalid token payload"
+    finally:
+        _reset()
+
+
+@pytest.mark.anyio
+async def test_redeem_invite_concurrent_double_redemption(client):
+    """If two requests race past the existence check, the second commit hits the unique
+    constraint on users.clerk_id — we catch IntegrityError and return 409, not 500."""
+    invite = InviteCode(code="RACE", max_uses=5, used_count=0)
+    session = _make_db_session(invite=invite, existing_user=None)
+
+    from sqlalchemy.exc import IntegrityError
+    session.commit.side_effect = IntegrityError("stmt", "params", Exception("orig"))
+
+    _override_db(session)
+
+    try:
+        with patch("app.api.routes.auth._verify_clerk_token", return_value=CLERK_PAYLOAD):
+            resp = await client.post(
+                "/api/auth/redeem-invite",
+                json={"code": "RACE"},
+                headers=AUTH_HEADERS,
+            )
+        assert resp.status_code == 409
+        assert resp.json()["detail"] == "already_redeemed"
+        session.rollback.assert_called_once()
+    finally:
+        _reset()
