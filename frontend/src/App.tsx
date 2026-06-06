@@ -26,6 +26,7 @@ function ProfileGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
+    setState("loading");
     api.getProfile()
       .then(() => { if (!cancelled) setState("ok"); })
       .catch((err) => {
