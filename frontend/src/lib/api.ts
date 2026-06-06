@@ -1,30 +1,31 @@
-import { supabase } from "./supabase";
+import { getAuthToken } from "./auth-token";
 
 const API_URL = import.meta.env.VITE_API_URL as string;
 
-async function getAuthHeaders(): Promise<Record<string, string>> {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session) throw new Error("Not authenticated");
-  return {
-    Authorization: `Bearer ${session.access_token}`,
-    "Content-Type": "application/json",
-  };
+export class ApiError extends Error {
+  constructor(public status: number, public detail: string) {
+    super(detail);
+  }
 }
 
 async function apiFetch<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const headers = await getAuthHeaders();
+  const token = await getAuthToken();
+  if (!token) throw new ApiError(401, "Not authenticated");
+
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
-    headers: { ...headers, ...options.headers },
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.detail || `API error ${res.status}`);
+    throw new ApiError(res.status, body.detail || `API error ${res.status}`);
   }
   return res.json();
 }
@@ -63,6 +64,13 @@ export const api = {
 
   // User
   getProfile: () => apiFetch<UserProfile>("/api/me"),
+
+  // Invite redemption
+  redeemInvite: (code: string) =>
+    apiFetch<{ id: string; email: string; clerk_id: string }>(
+      "/api/auth/redeem-invite",
+      { method: "POST", body: JSON.stringify({ code }) }
+    ),
 };
 
 export interface Manga {
