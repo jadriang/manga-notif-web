@@ -1,4 +1,3 @@
-import uuid
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi import HTTPException
@@ -29,6 +28,11 @@ FAKE_PAYLOAD = {
 }
 
 
+@pytest.fixture
+def anyio_backend():
+    return "asyncio"
+
+
 @pytest.mark.anyio
 async def test_get_current_user_existing_user():
     """Existing User is returned by clerk_id lookup."""
@@ -36,8 +40,8 @@ async def test_get_current_user_existing_user():
     existing.clerk_id = "user_2abc123xyz"
     session = _make_db_session(existing_user=existing)
 
-    with patch("app.auth._get_jwks", return_value=[]), \
-         patch("app.auth.jwt.decode", return_value=FAKE_PAYLOAD):
+    with patch("app.auth._get_jwks", return_value=[{"kid": "fake"}]), \
+         patch("app.auth._decode_with_jwks", return_value=FAKE_PAYLOAD):
         user = await get_current_user(
             credentials=_make_credentials(),
             db=session,
@@ -51,8 +55,8 @@ async def test_get_current_user_no_row_returns_invite_required():
     """Authenticated but no User row -> 403 invite_required."""
     session = _make_db_session(existing_user=None)
 
-    with patch("app.auth._get_jwks", return_value=[]), \
-         patch("app.auth.jwt.decode", return_value=FAKE_PAYLOAD):
+    with patch("app.auth._get_jwks", return_value=[{"kid": "fake"}]), \
+         patch("app.auth._decode_with_jwks", return_value=FAKE_PAYLOAD):
         with pytest.raises(HTTPException) as exc_info:
             await get_current_user(
                 credentials=_make_credentials(),
@@ -68,8 +72,8 @@ async def test_get_current_user_invalid_jwt():
     from jose import JWTError
     session = _make_db_session()
 
-    with patch("app.auth._get_jwks", return_value=[]), \
-         patch("app.auth.jwt.decode", side_effect=JWTError("bad sig")):
+    with patch("app.auth._get_jwks", return_value=[{"kid": "fake"}]), \
+         patch("app.auth._decode_with_jwks", side_effect=JWTError("bad sig")):
         with pytest.raises(HTTPException) as exc_info:
             await get_current_user(
                 credentials=_make_credentials(),
@@ -77,8 +81,3 @@ async def test_get_current_user_invalid_jwt():
             )
 
     assert exc_info.value.status_code == 401
-
-
-@pytest.fixture
-def anyio_backend():
-    return "asyncio"

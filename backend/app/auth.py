@@ -60,16 +60,7 @@ async def get_current_user(
     token = credentials.credentials
     try:
         keys = await _get_jwks()
-        if keys:
-            payload = _decode_with_jwks(token, keys)
-        else:
-            payload = jwt.decode(
-                token,
-                "",
-                algorithms=["RS256"],
-                issuer=settings.clerk_issuer,
-                options={"verify_aud": False, "verify_signature": False},
-            )
+        payload = _decode_with_jwks(token, keys)
     except JWTError as e:
         logger.warning("JWT decode failed: %s", e)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
