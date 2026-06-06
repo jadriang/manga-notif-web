@@ -4,12 +4,11 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    # Supabase
-    supabase_url: str = ""
-    supabase_anon_key: str = ""
-    supabase_jwt_secret: str = ""
+    # Clerk
+    clerk_jwks_url: str = ""
+    clerk_issuer: str = ""
 
-    # Database (Supabase Postgres connection string)
+    # Database
     database_url: str = ""
 
     # Telegram
