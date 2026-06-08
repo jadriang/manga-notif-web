@@ -7,12 +7,31 @@ Free-tier stack:
 | Frontend | GitHub Pages (`https://<owner>.github.io/manga-notif-web/`) |
 | Backend  | Render free web service (`https://<service>.onrender.com`) |
 | Cron     | GitHub Actions (`.github/workflows/check-manga.yml`, every 6h) |
-| DB + Auth | Supabase free |
+| DB        | Neon Postgres |
+| Auth      | Clerk (free tier) |
 | Telegram | Webhook → backend |
 
 Render's free tier sleeps after ~15 min idle (~30–60s cold start). The cron warms it before scraping; Telegram retries webhook deliveries for ~24h, so cold starts don't lose updates.
 
 ---
+
+## 0. Clerk setup
+
+One-time setup in the [Clerk dashboard](https://dashboard.clerk.com):
+
+1. Create a new Clerk application.
+2. **Sign-in methods**: enable Email + password (require email verification) AND Google OAuth.
+3. **For production**: in **SSO Connections → Google**, switch to custom credentials with your own Google Cloud OAuth Client ID + Secret (replaces Clerk's shared dev credentials).
+4. **Redirect URLs** to whitelist: `http://localhost:5173/manga-notif-web/` (dev) and `https://<owner>.github.io/manga-notif-web/` (prod).
+5. Create a **JWT template** named `default` with custom claims:
+   ```json
+   {
+     "email": "{{user.primary_email_address}}"
+   }
+   ```
+6. Note these values for later:
+   - **Publishable key** (`pk_test_...` or `pk_live_...`) → goes in `VITE_CLERK_PUBLISHABLE_KEY`
+   - **Frontend API URL** (e.g. `https://xxx.clerk.accounts.dev`) → derive `CLERK_ISSUER` and `CLERK_JWKS_URL`
 
 ## 1. Backend on Render
 
@@ -22,10 +41,9 @@ Render's free tier sleeps after ~15 min idle (~30–60s cold start). The cron wa
 
    | Var | Value |
    |---|---|
-   | `DATABASE_URL` | Supabase pooler URL, `postgresql+asyncpg://postgres.xxx:password@aws-0-region.pooler.supabase.com:6543/postgres` |
-   | `SUPABASE_URL` | `https://<project>.supabase.co` |
-   | `SUPABASE_ANON_KEY` | from Supabase project settings |
-   | `SUPABASE_JWT_SECRET` | from Supabase project settings |
+   | `DATABASE_URL` | Neon connection string, `postgresql+asyncpg://user:pass@host/db?ssl=require` |
+   | `CLERK_JWKS_URL` | `<clerk-frontend-api>/.well-known/jwks.json` |
+   | `CLERK_ISSUER` | `<clerk-frontend-api>` |
    | `TELEGRAM_BOT_TOKEN` | from BotFather |
    | `CRON_SECRET` | `python -c "import secrets; print(secrets.token_urlsafe(32))"` |
    | `FRONTEND_URL` | `https://<owner>.github.io` (origin only — no trailing slash, no path) |
@@ -52,8 +70,7 @@ Re-run `setWebhook` if the Render service URL ever changes.
 
    | Secret | Value |
    |---|---|
-   | `VITE_SUPABASE_URL` | same as Render |
-   | `VITE_SUPABASE_ANON_KEY` | same as Render |
+   | `VITE_CLERK_PUBLISHABLE_KEY` | from Clerk dashboard |
    | `VITE_API_URL` | `https://<service>.onrender.com` |
    | `VITE_TELEGRAM_BOT_USERNAME` | bot username without `@` |
 
@@ -70,6 +87,17 @@ Re-run `setWebhook` if the Render service URL ever changes.
 | `CRON_SECRET` | same value as in Render |
 
 Trigger manually any time via **Actions → Check Manga Updates → Run workflow**.
+
+## 5a. First-time invite code seeding
+
+After the first successful deploy, generate at least one invite code so users can register:
+
+```sh
+# Locally with prod DATABASE_URL set, or via a Render shell session:
+python backend/seed.py
+```
+
+The seed script prints `IMPORTANT: save this invite code -> <token>`. Share that token with whoever should be able to sign up.
 
 ## 5. End-to-end verification
 

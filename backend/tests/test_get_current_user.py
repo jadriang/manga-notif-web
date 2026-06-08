@@ -1,11 +1,10 @@
-import uuid
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user
-from app.models.tables import AllowedEmail, User
+from app.models.tables import User
 
 
 def _make_credentials(token="fake.jwt.token"):
@@ -14,57 +13,50 @@ def _make_credentials(token="fake.jwt.token"):
     return creds
 
 
-def _make_db_session(existing_user=None, allowed_email=None):
-    """Mock AsyncSession: 1st execute returns existing_user lookup, 2nd returns allowed_email lookup."""
+def _make_db_session(existing_user=None):
     session = AsyncMock(spec=AsyncSession)
-    call_count = 0
-
-    async def execute_side_effect(stmt):
-        nonlocal call_count
-        call_count += 1
-        result = MagicMock()
-        if call_count == 1:
-            result.scalar_one_or_none.return_value = existing_user
-        else:
-            result.scalar_one_or_none.return_value = allowed_email
-        return result
-
-    session.execute.side_effect = execute_side_effect
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = existing_user
+    session.execute.return_value = result
     return session
 
 
 FAKE_PAYLOAD = {
-    "sub": str(uuid.uuid4()),
+    "sub": "user_2abc123xyz",
     "email": "newuser@example.com",
-    "aud": "authenticated",
+    "iss": "https://example.clerk.accounts.dev",
 }
 
 
-@pytest.mark.anyio
-async def test_get_current_user_new_user_whitelisted():
-    """First login for a whitelisted email creates a User row."""
-    allowed = AllowedEmail(email="newuser@example.com")
-    session = _make_db_session(existing_user=None, allowed_email=allowed)
+@pytest.fixture
+def anyio_backend():
+    return "asyncio"
 
-    with patch("app.auth._get_jwks", return_value=[]), \
-         patch("app.auth.jwt.decode", return_value=FAKE_PAYLOAD):
+
+@pytest.mark.anyio
+async def test_get_current_user_existing_user():
+    """Existing User is returned by clerk_id lookup."""
+    existing = MagicMock(spec=User)
+    existing.clerk_id = "user_2abc123xyz"
+    session = _make_db_session(existing_user=existing)
+
+    with patch("app.auth._get_jwks", return_value=[{"kid": "fake"}]), \
+         patch("app.auth._decode_with_jwks", return_value=FAKE_PAYLOAD):
         user = await get_current_user(
             credentials=_make_credentials(),
             db=session,
         )
 
-    session.add.assert_called_once()
-    session.commit.assert_called_once()
-    assert user.email == "newuser@example.com"
+    assert user is existing
 
 
 @pytest.mark.anyio
-async def test_get_current_user_new_user_not_whitelisted():
-    """First login for a non-whitelisted email raises 403."""
-    session = _make_db_session(existing_user=None, allowed_email=None)
+async def test_get_current_user_no_row_returns_invite_required():
+    """Authenticated but no User row -> 403 invite_required."""
+    session = _make_db_session(existing_user=None)
 
-    with patch("app.auth._get_jwks", return_value=[]), \
-         patch("app.auth.jwt.decode", return_value=FAKE_PAYLOAD):
+    with patch("app.auth._get_jwks", return_value=[{"kid": "fake"}]), \
+         patch("app.auth._decode_with_jwks", return_value=FAKE_PAYLOAD):
         with pytest.raises(HTTPException) as exc_info:
             await get_current_user(
                 credentials=_make_credentials(),
@@ -72,26 +64,20 @@ async def test_get_current_user_new_user_not_whitelisted():
             )
 
     assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == "invite_required"
 
 
 @pytest.mark.anyio
-async def test_get_current_user_existing_user_not_rechecked():
-    """Returning users bypass the whitelist check (no second DB query)."""
-    existing = MagicMock(spec=User)
-    existing.email = "existing@example.com"
-    session = AsyncMock(spec=AsyncSession)
-    result = MagicMock()
-    result.scalar_one_or_none.return_value = existing
-    session.execute.return_value = result
+async def test_get_current_user_invalid_jwt():
+    from jose import JWTError
+    session = _make_db_session()
 
-    payload = {**FAKE_PAYLOAD, "email": "existing@example.com"}
+    with patch("app.auth._get_jwks", return_value=[{"kid": "fake"}]), \
+         patch("app.auth._decode_with_jwks", side_effect=JWTError("bad sig")):
+        with pytest.raises(HTTPException) as exc_info:
+            await get_current_user(
+                credentials=_make_credentials(),
+                db=session,
+            )
 
-    with patch("app.auth._get_jwks", return_value=[]), \
-         patch("app.auth.jwt.decode", return_value=payload):
-        user = await get_current_user(
-            credentials=_make_credentials(),
-            db=session,
-        )
-
-    assert user is existing
-    assert session.execute.call_count == 1  # only User lookup, no AllowedEmail lookup
+    assert exc_info.value.status_code == 401

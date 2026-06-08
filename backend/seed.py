@@ -101,5 +101,27 @@ async def seed():
         print("\nSeed complete!")
 
 
+async def seed_invite_code(code: str, max_uses: int, description: str = "") -> None:
+    """Insert (or skip if exists) a single invite code."""
+    from app.models.tables import InviteCode
+
+    async with async_session() as db:
+        result = await db.execute(select(InviteCode).where(InviteCode.code == code))
+        if result.scalar_one_or_none():
+            print(f"  Skipping invite code {code} (already exists)")
+            return
+        db.add(InviteCode(code=code, max_uses=max_uses, description=description))
+        await db.commit()
+        print(f"  ✓ invite code {code} (max_uses={max_uses})")
+
+
+async def main():
+    import secrets
+    await seed()
+    initial_code = secrets.token_urlsafe(12)
+    await seed_invite_code(initial_code, max_uses=10, description="initial migration")
+    print(f"\nIMPORTANT: save this invite code -> {initial_code}")
+
+
 if __name__ == "__main__":
-    asyncio.run(seed())
+    asyncio.run(main())

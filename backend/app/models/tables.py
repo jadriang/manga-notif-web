@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -16,7 +16,8 @@ class Base(DeclarativeBase):
 class User(Base):
     __tablename__ = "users"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    clerk_id: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     email: Mapped[str] = mapped_column(String(320), unique=True, nullable=False)
     telegram_chat_id: Mapped[Optional[str]] = mapped_column(String(64), unique=True)
     telegram_link_token: Mapped[Optional[str]] = mapped_column(String(64), unique=True)
@@ -60,7 +61,7 @@ class ChapterState(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     manga_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("manga.id"), nullable=False)
-    site: Mapped[str] = mapped_column(String(20), nullable=False)  # "asura" or "demonic"
+    site: Mapped[str] = mapped_column(String(20), nullable=False)
     latest_chapter: Mapped[str] = mapped_column(String(20), nullable=False)
     chapter_url: Mapped[Optional[str]] = mapped_column(Text)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -68,7 +69,12 @@ class ChapterState(Base):
     manga: Mapped[Manga] = relationship(back_populates="chapter_states")
 
 
-class AllowedEmail(Base):
-    __tablename__ = "allowed_emails"
+class InviteCode(Base):
+    __tablename__ = "invite_codes"
+    __table_args__ = (CheckConstraint("used_count <= max_uses", name="used_count_le_max"),)
 
-    email: Mapped[str] = mapped_column(String(320), primary_key=True)
+    code: Mapped[str] = mapped_column(String(64), primary_key=True)
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    max_uses: Mapped[int] = mapped_column(Integer, nullable=False)
+    used_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
