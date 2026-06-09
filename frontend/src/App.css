@@ -152,6 +152,13 @@ a:hover { text-decoration: underline; }
   font-size: 0.85rem;
 }
 
+.login-page--auth {
+  flex-direction: column;
+  gap: 1.25rem;
+}
+.login-page--auth .login-brand { margin-bottom: 0; }
+.login-page--auth .login-toggle { margin-top: 0; }
+
 /* ── Inputs ── */
 input {
   background: var(--bg);
