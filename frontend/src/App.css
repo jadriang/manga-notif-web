@@ -435,6 +435,38 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .hint { color: var(--text-muted); font-size: 0.8rem; margin-top: 0.5rem; line-height: 1.5; }
 
+/* ── Telegram setup banner ── */
+.telegram-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  background: var(--demonic-light);
+  border: 1px solid rgba(251, 146, 60, 0.4);
+  border-radius: var(--radius);
+  padding: 0.85rem 1rem;
+  margin-bottom: 1.25rem;
+}
+.telegram-banner-icon { font-size: 1.25rem; line-height: 1; }
+.telegram-banner-text { flex: 1; font-size: 0.875rem; color: var(--text); }
+.telegram-banner-text strong { color: var(--demonic); }
+.telegram-banner-text span { color: var(--text-muted); }
+.telegram-banner-action {
+  flex-shrink: 0;
+  background: #0088cc;
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius);
+  font-weight: 500;
+  font-size: 0.825rem;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.telegram-banner-action:hover { background: #006fa8; text-decoration: none; }
+@media (max-width: 560px) {
+  .telegram-banner { flex-wrap: wrap; }
+  .telegram-banner-action { width: 100%; text-align: center; }
+}
+
 /* ── Feedback ── */
 .error { color: var(--danger); font-size: 0.85rem; }
 .success { color: var(--success); font-size: 0.85rem; }
