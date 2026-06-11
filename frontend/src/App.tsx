@@ -13,7 +13,7 @@ import "./App.css";
 function TokenBridge() {
   const { getToken } = useAuth();
   useEffect(() => {
-    registerTokenGetter(() => getToken({ template: "default" }));
+    registerTokenGetter(() => getToken());
   }, [getToken]);
   return null;
 }
