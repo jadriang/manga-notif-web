@@ -42,7 +42,12 @@ async def telegram_webhook(
     x_telegram_bot_api_secret_token: str = Header(default=""),
 ):
     """Receive updates from Telegram Bot API."""
-    if settings.telegram_webhook_secret and not hmac.compare_digest(
+    # Fail closed: require the secret to be configured, then verify it.
+    # Without this, an unset secret would leave the webhook fully open.
+    if not settings.telegram_webhook_secret:
+        log.error("TELEGRAM_WEBHOOK_SECRET is not configured; rejecting webhook")
+        raise HTTPException(status_code=503, detail="Webhook not configured")
+    if not hmac.compare_digest(
         x_telegram_bot_api_secret_token, settings.telegram_webhook_secret
     ):
         raise HTTPException(status_code=403, detail="Forbidden")

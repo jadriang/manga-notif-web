@@ -180,6 +180,11 @@ async def persist_updates(
 
 @router.post("/check")
 async def check_for_updates(authorization: str = Header(...)):
+    # Fail closed: an unset secret must never authorize anyone (otherwise
+    # "Bearer " would match an empty CRON_SECRET).
+    if not settings.cron_secret:
+        log.error("CRON_SECRET is not configured; refusing cron request")
+        raise HTTPException(status_code=503, detail="Cron not configured")
     expected = f"Bearer {settings.cron_secret}"
     if not hmac.compare_digest(authorization, expected):
         raise HTTPException(status_code=401, detail="Unauthorized")
