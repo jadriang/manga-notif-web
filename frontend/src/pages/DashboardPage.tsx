@@ -8,6 +8,7 @@ type FilterTab = "all" | "subscribed";
 export default function DashboardPage() {
   const { signOut } = useClerk();
   const [manga, setManga] = useState<Manga[]>([]);
+  const [telegramLinked, setTelegramLinked] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<FilterTab>("all");
@@ -18,8 +19,12 @@ export default function DashboardPage() {
 
   const loadManga = async () => {
     try {
-      const data = await api.listManga();
+      const [data, profile] = await Promise.all([
+        api.listManga(),
+        api.getProfile(),
+      ]);
       setManga(data);
+      setTelegramLinked(Boolean(profile.telegram_chat_id));
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -59,13 +64,26 @@ export default function DashboardPage() {
           <h1>Manga Notifier</h1>
         </div>
         <nav>
-          <span className="btn-add" style={{ opacity: 0.4, cursor: "not-allowed" }}>+ Add Manga</span>
+          <Link to="/add" className="btn-add">+ Add Manga</Link>
           <Link to="/settings">Settings</Link>
           <button className="signout-btn" onClick={() => signOut()}>Sign Out</button>
         </nav>
       </header>
 
       {error && <p className="error">{error}</p>}
+
+      {!telegramLinked && (
+        <div className="telegram-banner" role="alert">
+          <span className="telegram-banner-icon">📨</span>
+          <div className="telegram-banner-text">
+            <strong>Telegram isn't set up yet.</strong>
+            <span> Notifications won't be sent until you link the Telegram bot.</span>
+          </div>
+          <Link to="/settings" className="telegram-banner-action">
+            Set up Telegram
+          </Link>
+        </div>
+      )}
 
       <div className="dashboard-toolbar">
         <div className="filter-tabs">
