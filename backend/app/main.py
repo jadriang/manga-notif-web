@@ -20,7 +20,9 @@ app = FastAPI(title="Manga Notifier", version="1.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.frontend_url],
-    allow_credentials=True,
+    # Auth is via the Authorization header (Bearer), not cookies, so
+    # credentialed CORS is unnecessary.
+    allow_credentials=False,
     allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["Authorization", "Content-Type"],
 )
