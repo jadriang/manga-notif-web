@@ -9,7 +9,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Header
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
@@ -25,6 +25,11 @@ log = logging.getLogger(__name__)
 
 SCRAPERS = {"asura": asura, "demonic": demonic}
 REQUEST_DELAY = 2  # seconds between scrape requests
+
+# Only one check may run at a time. Scraping all manga takes minutes; because it
+# runs in the background (see check_for_updates) a slow run must not overlap the
+# next scheduled trigger.
+_run_lock = asyncio.Lock()
 
 
 @dataclass
@@ -178,8 +183,45 @@ async def persist_updates(
     return len(updated_manga_ids), notify_payload
 
 
-@router.post("/check")
-async def check_for_updates(authorization: str = Header(...)):
+async def run_check() -> dict:
+    """Scrape every manga, persist diffs, and fire notifications.
+
+    Guarded so overlapping triggers can't run it twice concurrently.
+    """
+    if _run_lock.locked():
+        log.info("Cron check already running; skipping this trigger")
+        return {"skipped": True}
+
+    async with _run_lock:
+        # Phase 1: short DB read.
+        snapshots = await load_snapshots()
+
+        # Phase 2: slow scraping with no DB connection held.
+        scraped = await scrape_all(snapshots)
+
+        # Phase 3: short DB write + fetch notification targets.
+        updates_found, notify_payload = await persist_updates(snapshots, scraped)
+
+        # Phase 4: send Telegram notifications with no DB connection held.
+        notifications_sent = 0
+        for title, results, chat_ids in notify_payload:
+            for chat_id in chat_ids:
+                await send_notification(chat_id, title, results)
+                notifications_sent += 1
+
+        summary = {
+            "manga_checked": len(snapshots),
+            "updates_found": updates_found,
+            "notifications_sent": notifications_sent,
+        }
+        log.info("Cron check complete: %s", summary)
+        return summary
+
+
+@router.post("/check", status_code=202)
+async def check_for_updates(
+    background_tasks: BackgroundTasks, authorization: str = Header(...)
+):
     # Fail closed: an unset secret must never authorize anyone (otherwise
     # "Bearer " would match an empty CRON_SECRET).
     if not settings.cron_secret:
@@ -189,24 +231,9 @@ async def check_for_updates(authorization: str = Header(...)):
     if not hmac.compare_digest(authorization, expected):
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    # Phase 1: short DB read.
-    snapshots = await load_snapshots()
-
-    # Phase 2: slow scraping with no DB connection held.
-    scraped = await scrape_all(snapshots)
-
-    # Phase 3: short DB write + fetch notification targets.
-    updates_found, notify_payload = await persist_updates(snapshots, scraped)
-
-    # Phase 4: send Telegram notifications with no DB connection held.
-    notifications_sent = 0
-    for title, results, chat_ids in notify_payload:
-        for chat_id in chat_ids:
-            await send_notification(chat_id, title, results)
-            notifications_sent += 1
-
-    return {
-        "manga_checked": len(snapshots),
-        "updates_found": updates_found,
-        "notifications_sent": notifications_sent,
-    }
+    # Scraping all manga takes minutes, which exceeds the edge/proxy timeout in
+    # front of the host and made the caller intermittently see a 5xx. Return
+    # immediately and do the work in the background so the trigger always gets a
+    # fast, successful response.
+    background_tasks.add_task(run_check)
+    return {"status": "accepted"}

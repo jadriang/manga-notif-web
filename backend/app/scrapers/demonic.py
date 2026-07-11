@@ -11,6 +11,14 @@ from bs4 import BeautifulSoup
 BASE_URL = "https://demonicscans.org/manga/{slug}"
 CHAPTER_HREF_RE = re.compile(r"chapter=([\d.]+)")
 
+# A real browser UA: like Asura, the site is Cloudflare-fronted and blocks
+# obvious bot agents / datacenter IPs, which is the most likely reason scrapes
+# fail from the deployed host while the HTML selectors are unchanged.
+USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+)
+
 log = logging.getLogger(__name__)
 
 
@@ -63,7 +71,7 @@ async def get_latest_chapter(slug: str) -> dict | None:
         async with httpx.AsyncClient() as client:
             resp = await client.get(
                 url,
-                headers={"User-Agent": "MangaNotif/1.0 (+https://github.com)"},
+                headers={"User-Agent": USER_AGENT},
                 timeout=30,
                 follow_redirects=True,
             )

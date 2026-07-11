@@ -11,6 +11,12 @@ jobs:
     steps:
       - name: Trigger manga check
         run: |
-          curl -sf -X POST "${{ secrets.API_URL }}/api/cron/check" \
+          # The host runs on a free tier that cold-starts after idle, so the
+          # first hit can 5xx while it boots. Retry those, wait long enough for
+          # a cold boot, and print the body on failure instead of a bare exit 22.
+          curl -sS --fail-with-body \
+            --retry 5 --retry-delay 20 --retry-all-errors \
+            --connect-timeout 30 --max-time 120 \
+            -X POST "${{ secrets.API_URL }}/api/cron/check" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             -H "Content-Type: application/json"

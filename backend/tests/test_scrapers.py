@@ -49,6 +49,36 @@ def test_asura_parse_returns_none_without_chapters():
     assert asura.parse_latest_chapter("<html></html>", "whatever") is None
 
 
+def test_asura_base_slug_strips_rotating_hash():
+    # Asura appends a rotating "-<hash>" cache-buster to every slug.
+    assert asura.base_slug("nano-machine-a80d257e") == "nano-machine"
+    assert asura.base_slug("overgeared-5abb513e") == "overgeared"
+    # A slug with no hash suffix is left alone.
+    assert asura.base_slug("nano-machine") == "nano-machine"
+
+
+# The page's canonical slug carries the *current* hash, which differs from the
+# stored one after Asura rotates it. Parsing must follow the page's own slug.
+ASURA_ROTATED_HTML = """
+<html><head>
+<link rel="canonical" href="https://asurascans.com/comics/nano-machine-NEWHASH" />
+<meta property="og:title" content="Nano Machine | Asura Scans" />
+<meta property="og:image" content="https://cdn.asura.test/cover.jpg" />
+</head><body>
+<a href="/comics/nano-machine-NEWHASH/chapter/1">Ch 1</a>
+<a href="/comics/nano-machine-NEWHASH/chapter/320">Ch 320</a>
+</body></html>
+"""
+
+
+def test_asura_parse_uses_canonical_slug_over_stored():
+    # Requested with the OLD stored slug; page declares a new canonical slug.
+    result = asura.parse_latest_chapter(ASURA_ROTATED_HTML, "nano-machine-OLDHASH")
+    assert result is not None
+    assert result["chapter"] == "320"
+    assert result["url"] == "https://asurascans.com/comics/nano-machine-NEWHASH/chapter/320"
+
+
 def test_demonic_parse_extracts_title():
     result = demonic.parse_latest_chapter(DEMONIC_HTML)
     assert result is not None
