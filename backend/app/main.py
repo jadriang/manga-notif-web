@@ -11,7 +11,7 @@ from app.api.routes import auth, cron, manga, subscriptions, telegram_routes, us
 from app.config import settings
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=getattr(logging, settings.log_level.upper(), logging.INFO),
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 

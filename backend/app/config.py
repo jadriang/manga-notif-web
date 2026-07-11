@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     # CORS
     frontend_url: str = "http://localhost:5173"
 
+    # Logging — set LOG_LEVEL=DEBUG to see per-request scraper diagnostics.
+    log_level: str = "INFO"
+
     model_config = {"env_file": ".env"}
 
 

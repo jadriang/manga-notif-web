@@ -17,6 +17,8 @@ import re
 import httpx
 from bs4 import BeautifulSoup
 
+from app.scrapers.util import USER_AGENT, looks_like_challenge
+
 BASE_URL = "https://asurascans.com/comics/{slug}"
 CHAPTER_URL_RE = re.compile(r"/chapter/([\d.]+)$")
 # A trailing "-<6+ hex chars>" is Asura's rotating cache-buster, not part of
@@ -24,13 +26,6 @@ CHAPTER_URL_RE = re.compile(r"/chapter/([\d.]+)$")
 HASH_SUFFIX_RE = re.compile(r"-[0-9a-f]{6,}$")
 # Pull the slug out of any /comics/<slug>[/...] URL.
 CANONICAL_SLUG_RE = re.compile(r"/comics/([^/?#]+)")
-
-# A real browser UA: Asura sits behind Cloudflare, which challenges/blocks
-# obvious bot agents (and datacenter IPs) far more aggressively.
-USER_AGENT = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-)
 
 log = logging.getLogger(__name__)
 
@@ -85,8 +80,22 @@ def parse_latest_chapter(html: str, slug: str) -> dict | None:
                 best_href = href
 
     if best_chapter < 0:
-        log.warning("AsuraScans: no chapters found for %s", slug)
+        if looks_like_challenge(html):
+            log.warning(
+                "AsuraScans: got a bot/JS challenge page for %s (canonical=%s) — "
+                "likely IP/UA blocked, not a markup change",
+                slug, canonical,
+            )
+        else:
+            log.warning(
+                "AsuraScans: no chapters found for %s (canonical=%s, %d bytes) — "
+                "markup may have changed", slug, canonical, len(html),
+            )
         return None
+
+    log.debug(
+        "AsuraScans: %s -> canonical=%s latest=%s", slug, canonical, best_chapter
+    )
 
     m2 = CHAPTER_URL_RE.search(best_href)
     chapter_str = m2.group(1) if m2 else str(best_chapter)
@@ -126,6 +135,10 @@ async def get_latest_chapter(slug: str) -> dict | None:
                     headers={"User-Agent": USER_AGENT},
                     timeout=30,
                     follow_redirects=True,
+                )
+                log.debug(
+                    "AsuraScans GET %s -> %s (final=%s)",
+                    url, resp.status_code, resp.url,
                 )
                 resp.raise_for_status()
             except httpx.HTTPError as exc:

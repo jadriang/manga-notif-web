@@ -1,6 +1,7 @@
 """Tests for scraper HTML parsing (pure, no network)."""
 
 from app.scrapers import asura, demonic
+from app.scrapers.util import looks_like_challenge
 
 ASURA_HTML = """
 <html><head>
@@ -100,3 +101,10 @@ def test_demonic_parse_title_none_when_missing():
 
 def test_demonic_parse_returns_none_without_chapters():
     assert demonic.parse_latest_chapter("<html></html>") is None
+
+
+def test_looks_like_challenge_detects_cloudflare():
+    assert looks_like_challenge("<html><title>Just a moment...</title></html>")
+    assert looks_like_challenge("<h1>Attention Required! | Cloudflare</h1>")
+    assert not looks_like_challenge(ASURA_HTML)
+    assert not looks_like_challenge(DEMONIC_HTML)

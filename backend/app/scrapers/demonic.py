@@ -8,16 +8,10 @@ import re
 import httpx
 from bs4 import BeautifulSoup
 
+from app.scrapers.util import USER_AGENT, looks_like_challenge
+
 BASE_URL = "https://demonicscans.org/manga/{slug}"
 CHAPTER_HREF_RE = re.compile(r"chapter=([\d.]+)")
-
-# A real browser UA: like Asura, the site is Cloudflare-fronted and blocks
-# obvious bot agents / datacenter IPs, which is the most likely reason scrapes
-# fail from the deployed host while the HTML selectors are unchanged.
-USER_AGENT = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-)
 
 log = logging.getLogger(__name__)
 
@@ -42,7 +36,16 @@ def parse_latest_chapter(html: str) -> dict | None:
                 best_href = href
 
     if best_chapter < 0:
-        log.warning("DemonicScans: no chapters found")
+        if looks_like_challenge(html):
+            log.warning(
+                "DemonicScans: got a bot/JS challenge page — likely IP/UA "
+                "blocked, not a markup change"
+            )
+        else:
+            log.warning(
+                "DemonicScans: no chapters found (%d bytes) — markup may have "
+                "changed", len(html),
+            )
         return None
 
     m2 = CHAPTER_HREF_RE.search(best_href)
@@ -75,6 +78,7 @@ async def get_latest_chapter(slug: str) -> dict | None:
                 timeout=30,
                 follow_redirects=True,
             )
+            log.debug("DemonicScans GET %s -> %s", url, resp.status_code)
             resp.raise_for_status()
     except httpx.HTTPError as exc:
         log.warning("DemonicScans request failed for %s: %s", slug, exc)
