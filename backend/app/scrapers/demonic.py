@@ -8,6 +8,8 @@ import re
 import httpx
 from bs4 import BeautifulSoup
 
+from app.scrapers.util import USER_AGENT, looks_like_challenge
+
 BASE_URL = "https://demonicscans.org/manga/{slug}"
 CHAPTER_HREF_RE = re.compile(r"chapter=([\d.]+)")
 
@@ -34,7 +36,16 @@ def parse_latest_chapter(html: str) -> dict | None:
                 best_href = href
 
     if best_chapter < 0:
-        log.warning("DemonicScans: no chapters found")
+        if looks_like_challenge(html):
+            log.warning(
+                "DemonicScans: got a bot/JS challenge page — likely IP/UA "
+                "blocked, not a markup change"
+            )
+        else:
+            log.warning(
+                "DemonicScans: no chapters found (%d bytes) — markup may have "
+                "changed", len(html),
+            )
         return None
 
     m2 = CHAPTER_HREF_RE.search(best_href)
@@ -63,10 +74,11 @@ async def get_latest_chapter(slug: str) -> dict | None:
         async with httpx.AsyncClient() as client:
             resp = await client.get(
                 url,
-                headers={"User-Agent": "MangaNotif/1.0 (+https://github.com)"},
+                headers={"User-Agent": USER_AGENT},
                 timeout=30,
                 follow_redirects=True,
             )
+            log.debug("DemonicScans GET %s -> %s", url, resp.status_code)
             resp.raise_for_status()
     except httpx.HTTPError as exc:
         log.warning("DemonicScans request failed for %s: %s", slug, exc)

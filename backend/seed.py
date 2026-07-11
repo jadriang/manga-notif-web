@@ -17,22 +17,27 @@ from app.database import async_session, engine
 from app.models.tables import Base, ChapterState, Manga
 
 
-# Data from original config.py
+# Data from original config.py.
+#
+# Asura slugs are stored WITHOUT the rotating "-<hash>" suffix. Asura rotates
+# that hash periodically, so the hashless (bare) slug is the stable form: it
+# 302-redirects to the current canonical, and the scraper follows it. Demonic
+# slugs are kept verbatim (the site normalizes the over-encoded ones).
 MANGA_LIST = [
-    {"title": "Nano Machine", "asura": "nano-machine-75e30c62", "demonic": "Nano-Machine"},
-    {"title": "The Regressed Mercenary's Machinations", "asura": "the-regressed-mercenarys-machinations-75e30c62", "demonic": "The-Regressed-Mercenary%2527s-Machinations"},
-    {"title": "Return of the Mount Hua Sect", "asura": "return-of-the-mount-hua-sect-75e30c62", "demonic": "Return-of-the-Mount-Hua-Sect"},
-    {"title": "Chronicles of the Lazy Sovereign", "asura": "chronicles-of-the-lazy-sovereign-75e30c62", "demonic": "Chronicles-of-the-Lazy-Sovereign"},
-    {"title": "I Am the Fated Villain", "asura": "i-am-the-fated-villain-75e30c62", "demonic": "I-Am-the-Fated-Villain"},
-    {"title": "Raising Villains the Right Way", "asura": "raising-villains-the-right-way-75e30c62", "demonic": "Raising-Villains-the-Right-Way"},
-    {"title": "Absolute Sword Sense", "asura": "absolute-sword-sense-75e30c62", "demonic": "Absolute-Sword-Sense"},
-    {"title": "Murim Psychopath", "asura": "murim-psychopath-75e30c62", "demonic": "Murim-Psychopath"},
-    {"title": "Star-Embracing Swordmaster", "asura": "star-embracing-swordmaster-75e30c62", "demonic": "Star%25252DEmbracing-Swordmaster"},
-    {"title": "Return of the Apocalypse-Class Death Knight", "asura": "return-of-the-apocalypse-class-death-knight-75e30c62", "demonic": "Return-of-the-Apocalypse%25252DClass-Death-Knight"},
-    {"title": "Eternally Regressing Knight", "asura": "eternally-regressing-knight-75e30c62", "demonic": "Eternally-Regressing-Knight"},
+    {"title": "Nano Machine", "asura": "nano-machine", "demonic": "Nano-Machine"},
+    {"title": "The Regressed Mercenary's Machinations", "asura": "the-regressed-mercenarys-machinations", "demonic": "The-Regressed-Mercenary%2527s-Machinations"},
+    {"title": "Return of the Mount Hua Sect", "asura": "return-of-the-mount-hua-sect", "demonic": "Return-of-the-Mount-Hua-Sect"},
+    {"title": "Chronicles of the Lazy Sovereign", "asura": "chronicles-of-the-lazy-sovereign", "demonic": "Chronicles-of-the-Lazy-Sovereign"},
+    {"title": "I Am the Fated Villain", "asura": "i-am-the-fated-villain", "demonic": "I-Am-the-Fated-Villain"},
+    {"title": "Raising Villains the Right Way", "asura": "raising-villains-the-right-way", "demonic": "Raising-Villains-the-Right-Way"},
+    {"title": "Absolute Sword Sense", "asura": "absolute-sword-sense", "demonic": "Absolute-Sword-Sense"},
+    {"title": "Murim Psychopath", "asura": "murim-psychopath", "demonic": "Murim-Psychopath"},
+    {"title": "Star-Embracing Swordmaster", "asura": "star-embracing-swordmaster", "demonic": "Star%25252DEmbracing-Swordmaster"},
+    {"title": "Return of the Apocalypse-Class Death Knight", "asura": "return-of-the-apocalypse-class-death-knight", "demonic": "Return-of-the-Apocalypse%25252DClass-Death-Knight"},
+    {"title": "Eternally Regressing Knight", "asura": "eternally-regressing-knight", "demonic": "Eternally-Regressing-Knight"},
     {"title": "Reborn Rich", "demonic": "Reborn-Rich"},
     {"title": "Real Man", "demonic": "Real-Man"},
-    {"title": "Overgeared", "asura": "overgeared-5abb513e", "demonic": "Overgeared"},
+    {"title": "Overgeared", "asura": "overgeared", "demonic": "Overgeared"},
     {"title": "The Great Mage Returns After 4000 Years", "demonic": "The-Steel-Emperor"},
 ]
 
@@ -69,11 +74,26 @@ async def seed():
     async with async_session() as db:
         for entry in MANGA_LIST:
             title = entry["title"]
+            new_asura = entry.get("asura")
+            new_demonic = entry.get("demonic")
 
-            # Check if already exists
+            # If it already exists, refresh the slugs in place (Asura's hash may
+            # have rotated) but leave chapter state untouched so we don't
+            # re-notify or skip chapters.
             result = await db.execute(select(Manga).where(Manga.title == title))
-            if result.scalar_one_or_none():
-                print(f"  Skipping {title} (already exists)")
+            existing = result.scalar_one_or_none()
+            if existing:
+                changes = []
+                if new_asura is not None and existing.asura_slug != new_asura:
+                    changes.append(f"asura {existing.asura_slug!r}->{new_asura!r}")
+                    existing.asura_slug = new_asura
+                if new_demonic is not None and existing.demonic_slug != new_demonic:
+                    changes.append(f"demonic {existing.demonic_slug!r}->{new_demonic!r}")
+                    existing.demonic_slug = new_demonic
+                if changes:
+                    print(f"  ~ {title}: updated slugs ({'; '.join(changes)})")
+                else:
+                    print(f"  Skipping {title} (already up to date)")
                 continue
 
             manga = Manga(
